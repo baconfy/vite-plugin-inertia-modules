@@ -1,4 +1,5 @@
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import type {Plugin} from 'vite';
 import {type ComposerModule, discoverModules} from './discovery';
 import {generateVirtualModule} from './virtual';
@@ -11,6 +12,12 @@ export interface InertiaModulesOptions {
   pages?: string;
   extensions?: string[];
   virtualId?: string;
+}
+
+const RUNTIME_ID = 'vite-plugin-inertia-modules/runtime';
+
+function runtimeFile(): string {
+  return fileURLToPath(new URL('./runtime.js', import.meta.url));
 }
 
 export function inertiaModules(options: InertiaModulesOptions = {}): Plugin {
@@ -47,7 +54,13 @@ export function inertiaModules(options: InertiaModulesOptions = {}): Plugin {
     },
 
     resolveId(id) {
-      if (id === virtualId) return resolvedId;
+      if (id === virtualId) {
+        return resolvedId;
+      }
+
+      if (id === RUNTIME_ID) {
+        return runtimeFile();
+      }
     },
 
     load(id) {
