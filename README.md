@@ -154,13 +154,43 @@ as [`client.d.ts`](./client.d.ts).
 - Local development with Composer [path repositories](https://getcomposer.org/doc/05-repositories.md#path)
   works out of the box — symlinks are resolved and allowed in the dev server.
 
-## Caveats
+## Laravel starter kits and the `@vite` directive
 
-- Module pages must use the **same UI framework** as the host app.
-- Composer 2 is required (`vendor/composer/installed.json`).
-- Pages are discovered at (re)build time; installing a module triggers a
-  reload in dev, but adding files to a module's pages dir may require
-  restarting the dev server in some setups.
+Laravel's React/Vue starter kits include the current page component in the
+`@vite` directive of `resources/views/app.blade.php`:
+
+```blade
+@vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
+```
+
+This is a dev-only optimization: it preloads the page's own CSS to avoid a
+flash of unstyled content. For namespaced pages (`payments::Invoices/Index`),
+the path is built by convention and doesn't exist — resulting in a harmless
+but noisy `404` request on every page load.
+
+You have two options:
+
+**Drop the page entry** (simplest — pages still load normally through the
+resolver; you only lose the dev-mode CSS preload, which is irrelevant unless
+your pages import their own CSS files):
+
+```blade
+@vite(['resources/css/app.css', 'resources/js/app.tsx'])
+```
+
+**Or skip it conditionally**, keeping the optimization for conventional pages:
+
+```blade
+@php
+    $entries = ['resources/css/app.css', 'resources/js/app.tsx'];
+
+    if (! str_contains($page['component'] ?? '', '::')) {
+        $entries[] = "resources/js/pages/{$page['component']}.tsx";
+    }
+@endphp
+
+@vite($entries)
+```
 
 ## License
 
