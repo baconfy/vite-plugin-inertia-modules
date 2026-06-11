@@ -1,5 +1,9 @@
 # vite-plugin-inertia-modules
 
+[![CI](https://github.com/baconfy/vite-plugin-inertia-modules/actions/workflows/ci.yml/badge.svg)](https://github.com/baconfy/vite-plugin-inertia-modules/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/vite-plugin-inertia-modules.svg)](https://www.npmjs.com/package/vite-plugin-inertia-modules)
+[![license](https://img.shields.io/npm/l/vite-plugin-inertia-modules.svg)](./LICENSE)
+
 > Serve Inertia pages straight from Composer packages.
 
 Build modular Laravel + Inertia applications where each module is a Composer
