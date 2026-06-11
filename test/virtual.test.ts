@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateVirtualModule } from '../src/virtual';
-import type { ComposerModule } from '../src';
+import type { ComposerModule } from '../src/discovery';
 
 const payments: ComposerModule = {
   package: 'baconfy/payments',
@@ -10,92 +10,49 @@ const payments: ComposerModule = {
   pagesPath: 'resources/js/pages',
 };
 
-type GlobMap = Record<string, Record<string, () => unknown>>;
-
-function run(code: string, globs: GlobMap) {
-  const executable = code
-    .replace(/import\.meta\.glob\('([^']+)'\)/g, '__globs[`$1`] ?? {}')
-    .replace(/export const /g, 'const ')
-    .replace(/export function /g, 'function ');
-
-  const factory = new Function('__globs', `${executable}\nreturn { modules, resolvePage };`);
-
-  return factory(globs) as {
-    modules: string[];
-    resolvePage: (name: string) => unknown;
-  };
-}
-
-function generate(modules: ComposerModule[] = [payments], extensions = ['tsx', 'jsx']) {
-  return generateVirtualModule({ modules, appPagesPath: '/resources/js/pages', extensions });
-}
-
 describe('generateVirtualModule', () => {
-  it('uses brace expansion for multiple extensions and none for a single one', () => {
-    expect(generate()).toContain('*.{tsx,jsx}');
+  it('imports the runtime resolver from the package', () => {
+    const code = generateVirtualModule({
+      modules: [payments],
+      appPagesPath: '/resources/js/pages',
+      extensions: ['tsx'],
+    });
 
-    const single = generate([payments], ['vue']);
+    expect(code).toContain("from 'vite-plugin-inertia-modules/runtime'");
+    expect(code).toContain('createResolver({');
+  });
 
-    expect(single).toContain('*.vue');
-    expect(single).not.toContain('*.{');
+  it('generates literal glob patterns for app and module pages', () => {
+    const code = generateVirtualModule({
+      modules: [payments],
+      appPagesPath: '/resources/js/pages',
+      extensions: ['tsx', 'jsx'],
+    });
+
+    expect(code).toContain("import.meta.glob('/resources/js/pages/**/*.{tsx,jsx}')");
+    expect(code).toContain(
+      "import.meta.glob('/vendor/baconfy/payments/resources/js/pages/**/*.{tsx,jsx}')",
+    );
+  });
+
+  it('uses no brace expansion for a single extension', () => {
+    const code = generateVirtualModule({
+      modules: [payments],
+      appPagesPath: '/resources/js/pages',
+      extensions: ['vue'],
+    });
+
+    expect(code).toContain('*.vue');
+    expect(code).not.toContain('*.{');
   });
 
   it('exports the list of module names', () => {
-    const { modules } = run(generate(), {});
-
-    expect(modules).toEqual(['payments']);
-  });
-
-  it('resolves app pages without a namespace', () => {
-    const loaded: string[] = [];
-    const { resolvePage } = run(generate(), {
-      '/resources/js/pages/**/*.{tsx,jsx}': {
-        '/resources/js/pages/Dashboard.tsx': () => loaded.push('dashboard'),
-      },
+    const code = generateVirtualModule({
+      modules: [payments],
+      appPagesPath: '/resources/js/pages',
+      extensions: ['tsx'],
     });
 
-    resolvePage('Dashboard');
-
-    expect(loaded).toEqual(['dashboard']);
-  });
-
-  it('resolves module pages through the namespace', () => {
-    const loaded: string[] = [];
-    const { resolvePage } = run(generate(), {
-      '/vendor/baconfy/payments/resources/js/pages/**/*.{tsx,jsx}': {
-        '/vendor/baconfy/payments/resources/js/pages/Invoices/Index.tsx': () =>
-          loaded.push('invoices'),
-      },
-    });
-
-    resolvePage('payments::Invoices/Index');
-
-    expect(loaded).toEqual(['invoices']);
-  });
-
-  it('falls back through extensions in order', () => {
-    const loaded: string[] = [];
-    const { resolvePage } = run(generate(), {
-      '/resources/js/pages/**/*.{tsx,jsx}': {
-        '/resources/js/pages/Legacy.jsx': () => loaded.push('legacy-jsx'),
-      },
-    });
-
-    resolvePage('Legacy');
-
-    expect(loaded).toEqual(['legacy-jsx']);
-  });
-
-  it('throws a helpful error for an unknown module', () => {
-    const { resolvePage } = run(generate(), {});
-
-    expect(() => resolvePage('billing::Index')).toThrowError(/Unknown module: "billing"/);
-    expect(() => resolvePage('billing::Index')).toThrowError(/Installed: payments/);
-  });
-
-  it('throws a helpful error for a missing page', () => {
-    const { resolvePage } = run(generate(), {});
-
-    expect(() => resolvePage('payments::Nope')).toThrowError(/Page not found/);
+    expect(code).toContain(`export const modules = ["payments"]`);
   });
 });

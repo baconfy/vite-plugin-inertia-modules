@@ -27,14 +27,9 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    },
-    "./client": {
-      "types": "./client.d.ts"
-    }
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./runtime": { "types": "./dist/runtime.d.ts", "import": "./dist/runtime.js", "require": "./dist/runtime.cjs" },
+    "./client": { "types": "./client.d.ts" }
   },
   "scripts": {
     "build": "tsup",
