@@ -27,7 +27,7 @@ export function createResolver(config: ResolverConfig) {
 
     throw new Error(
       `[inertia-modules] Page not found: "${label}" ` +
-      `(looked in ${base}/${page}.{${extensions.join(',')}})`,
+        `(looked in ${base}/${page}.{${extensions.join(',')}})`,
     );
   };
 

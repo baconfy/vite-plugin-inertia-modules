@@ -76,12 +76,16 @@ export function inertiaModules(options: InertiaModulesOptions = {}): Plugin {
     },
 
     config() {
-      const discovered = discoverModules({root: process.cwd(), manifestKey, defaultPagesPath: pages});
+      const cwd = process.cwd();
+      const discovered = discoverModules({root: cwd, manifestKey, defaultPagesPath: pages});
+      const hasLinked = discovered.some((m) => path.join(cwd, m.webPath) !== m.realPath);
 
       return {
+        ...(hasLinked ? {resolve: {preserveSymlinks: true}} : {}),
+
         server: {
           fs: {
-            allow: [process.cwd(), ...discovered.map((m) => m.realPath)],
+            allow: [cwd, ...discovered.map((m) => m.realPath)],
           },
         },
       };
@@ -102,13 +106,20 @@ export function inertiaModules(options: InertiaModulesOptions = {}): Plugin {
         }
       }
 
-      if (importer && mapper.isInsideVendor(importer)) {
-        const resolved = await this.resolve(id, importer, {...resolveOptions, skipSelf: true});
+      if (importer) {
+        const vendorImporter = mapper.toVendor(importer) ?? (mapper.isInsideVendor(importer) ? importer : null);
 
-        if (resolved) {
-          const vendorId = !resolved.external ? mapper.toVendor(resolved.id) : null;
+        if (vendorImporter) {
+          const resolved = await this.resolve(id, vendorImporter, {
+            ...resolveOptions,
+            skipSelf: true,
+          });
 
-          return vendorId ? {...resolved, id: vendorId} : resolved;
+          if (resolved) {
+            const remapped = !resolved.external ? mapper.toVendor(resolved.id) : null;
+
+            return remapped ? {...resolved, id: remapped} : resolved;
+          }
         }
       }
     },

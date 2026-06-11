@@ -35,23 +35,22 @@ export function discoverModules(options: DiscoverOptions): ComposerModule[] {
 
   for (const pkg of (installed.packages ?? []) as Record<string, any>[]) {
     const meta = pkg.extra?.[manifestKey];
-    const installPath = pkg['install-path'];
 
-    if (!meta?.module || !installPath) {
+    if (!meta?.module || !pkg.name) {
       continue;
     }
 
-    const absolute = path.resolve(root, 'vendor', 'composer', installPath);
+    const vendorPath = path.join(root, 'vendor', pkg.name);
 
-    if (!fs.existsSync(absolute)) {
+    if (!fs.existsSync(vendorPath)) {
       continue;
     }
 
     modules.push({
       package: pkg.name,
       name: meta.module,
-      webPath: '/' + path.relative(root, absolute).split(path.sep).join('/'),
-      realPath: fs.realpathSync(absolute),
+      webPath: '/vendor/' + pkg.name,
+      realPath: fs.realpathSync(vendorPath),
       pagesPath: meta.pages ?? defaultPagesPath,
     });
   }
