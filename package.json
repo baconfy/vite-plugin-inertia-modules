@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-inertia-modules",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "Serve Inertia pages from Composer packages. Build modular Laravel apps where each module ships its own frontend.",
   "type": "module",
   "license": "MIT",
