@@ -20,6 +20,38 @@ function runtimeFile(): string {
   return fileURLToPath(new URL('./runtime.js', import.meta.url));
 }
 
+interface PathMapper {
+  isInsideVendor: (file: string) => boolean;
+  toVendor: (file: string) => string | null;
+}
+
+function createPathMapper(root: string, modules: ComposerModule[]): PathMapper {
+  const linked = modules
+    .map((m) => ({vendor: path.join(root, m.webPath), real: m.realPath}))
+    .filter((m) => m.vendor !== m.real);
+
+  const clean = (file: string) => file.split('?')[0];
+
+  return {
+    isInsideVendor: (file) => {
+      const f = clean(file);
+      return linked.some((m) => f === m.vendor || f.startsWith(m.vendor + path.sep));
+    },
+
+    toVendor: (file) => {
+      const f = clean(file);
+
+      for (const m of linked) {
+        if (f === m.real || f.startsWith(m.real + path.sep)) {
+          return m.vendor + f.slice(m.real.length);
+        }
+      }
+
+      return null;
+    },
+  };
+}
+
 export function inertiaModules(options: InertiaModulesOptions = {}): Plugin {
   const manifestKey = options.manifestKey ?? 'inertia-modules';
   const appPages = options.appPages ?? '/resources/js/pages';
@@ -30,6 +62,7 @@ export function inertiaModules(options: InertiaModulesOptions = {}): Plugin {
 
   let root = process.cwd();
   let modules: ComposerModule[] = [];
+  let mapper = createPathMapper(root, modules);
 
   const discover = () => discoverModules({root, manifestKey, defaultPagesPath: pages});
 
@@ -39,6 +72,7 @@ export function inertiaModules(options: InertiaModulesOptions = {}): Plugin {
     configResolved(config) {
       root = config.root;
       modules = discover();
+      mapper = createPathMapper(root, modules);
     },
 
     config() {
@@ -53,7 +87,7 @@ export function inertiaModules(options: InertiaModulesOptions = {}): Plugin {
       };
     },
 
-    async resolveId(id, importer, options) {
+    async resolveId(id, importer, resolveOptions) {
       if (id === virtualId) {
         return resolvedId;
       }
@@ -62,18 +96,19 @@ export function inertiaModules(options: InertiaModulesOptions = {}): Plugin {
         return runtimeFile();
       }
 
-      if (importer && !id.startsWith('.') && !id.startsWith('\0') && !path.isAbsolute(id)) {
-        const fromLinkedModule = modules.some((m) => !m.realPath.startsWith(root) && importer.startsWith(m.realPath));
+      for (const m of modules) {
+        if (id === m.webPath || id.startsWith(m.webPath + '/')) {
+          return path.join(root, id);
+        }
+      }
 
-        if (fromLinkedModule) {
-          const resolved = await this.resolve(id, path.join(root, 'index.html'), {
-            ...options,
-            skipSelf: true,
-          });
+      if (importer && mapper.isInsideVendor(importer)) {
+        const resolved = await this.resolve(id, importer, {...resolveOptions, skipSelf: true});
 
-          if (resolved) {
-            return resolved;
-          }
+        if (resolved) {
+          const vendorId = !resolved.external ? mapper.toVendor(resolved.id) : null;
+
+          return vendorId ? {...resolved, id: vendorId} : resolved;
         }
       }
     },
@@ -93,6 +128,7 @@ export function inertiaModules(options: InertiaModulesOptions = {}): Plugin {
         if (path.resolve(file) !== installedJson) return;
 
         modules = discover();
+        mapper = createPathMapper(root, modules);
 
         const mod = server.moduleGraph.getModuleById(resolvedId);
         if (mod) server.moduleGraph.invalidateModule(mod);
