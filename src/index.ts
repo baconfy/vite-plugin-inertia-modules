@@ -53,13 +53,28 @@ export function inertiaModules(options: InertiaModulesOptions = {}): Plugin {
       };
     },
 
-    resolveId(id) {
+    async resolveId(id, importer, options) {
       if (id === virtualId) {
         return resolvedId;
       }
 
       if (id === RUNTIME_ID) {
         return runtimeFile();
+      }
+
+      if (importer && !id.startsWith('.') && !id.startsWith('\0') && !path.isAbsolute(id)) {
+        const fromLinkedModule = modules.some((m) => !m.realPath.startsWith(root) && importer.startsWith(m.realPath));
+
+        if (fromLinkedModule) {
+          const resolved = await this.resolve(id, path.join(root, 'index.html'), {
+            ...options,
+            skipSelf: true,
+          });
+
+          if (resolved) {
+            return resolved;
+          }
+        }
       }
     },
 
